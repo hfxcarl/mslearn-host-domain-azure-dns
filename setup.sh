@@ -1,7 +1,19 @@
 #!/bin/bash
 
+
 RgName=`az group list --query '[0].name' --output tsv`
 Location=`az group list --query '[0].location' --output tsv`
+
+## lookup standard VM size by location to avoid errors:
+#    "The default value of '--size' will be changed to 'Standard_D2s_v5' from 'Standard_DS1_v2' in a future release."
+vmSKU=`az vm list-skus --location $Location --resource-type virtualMachines --zone --size Standard_D2s --all --output table | grep -v 'NotAvailableForSubscription' | head -n 1 | awk '{print $3}'`
+if [[ "$vmSKU" == "" ]]; then
+    echo "*** ERROR: could not find suitable VM in your location=$Location"
+    exit 1
+fi
+## Troubleshoot - list available VMs in location/zone:
+#az vm list-skus --location $Location --resource-type virtualMachines --zone --size Standard_D2s --all --output table | grep -v 'NotAvailableForSubscription'
+
 
 date
 # Create a Virtual Network for the VMs
@@ -59,6 +71,7 @@ for i in `seq 1 2`; do
         --location $Location \
         --image Ubuntu2204 \
         --availability-set portalAvailabilitySet \
+        --size $vmSKU \
         --generate-ssh-keys \
         --custom-data cloud-init.txt
 done
@@ -129,12 +142,4 @@ echo '--------------------------------------------------------'
 echo '  Load balancer deployed to the IP Address shown above'
 echo '--------------------------------------------------------'
 
-
-
-
-
-
-
-
-
-
+exit 0
